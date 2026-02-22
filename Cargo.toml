@@ -1,0 +1,24 @@
+[package]
+name = "vnc-egui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.22"
+egui = "0.22"
+vnc = { path = "vnc-lib" }
+byteorder = "1.5"
+log = "0.4"
+env_logger = "0.10"
+rfd = "0.11" # For dialogs if needed
+image = "0.24" # For loading icons
+x11 = "2.21"
+winapi = { version = "0.3", features = ["windef", "winuser"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+egui_extras = { version = "0.22", features = ["svg"] }
+
+[dependencies.sdl2]
+version = "0.35"
+# We might need sdl2 for keysym mapping or similar if we want to reuse codebase, 
+# but let's try to stay pure egui first.
