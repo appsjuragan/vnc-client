@@ -104,7 +104,7 @@ impl Default for VncApp {
             }
         };
 
-        Self {
+        let app = Self {
             state: AppState::Connect,
             host: config.host,
             port: config.port,
@@ -129,8 +129,51 @@ impl Default for VncApp {
             last_buttons: 0,
             show_options: false,
             show_info: false,
+        };
+        app
+    }
+}
+
+fn setup_custom_style(ctx: &egui::Context) {
+    let mut style = (*ctx.style()).clone();
+
+    // Premium dark theme
+    style.visuals = egui::Visuals::dark();
+    style.visuals.window_rounding = 12.0.into();
+    style.visuals.window_shadow.extrusion = 20.0;
+
+    // Widget colors
+    style.visuals.widgets.noninteractive.bg_fill = Color32::from_rgb(20, 20, 25);
+    style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(45, 45, 55);
+    style.visuals.widgets.inactive.fg_stroke =
+        egui::Stroke::new(1.0, Color32::from_rgb(200, 200, 210));
+
+    style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(60, 60, 80);
+    style.visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.5, Color32::WHITE);
+
+    style.visuals.widgets.active.bg_fill = Color32::from_rgb(0, 110, 200);
+
+    // Spacing
+    style.spacing.item_spacing = Vec2::new(12.0, 12.0);
+    style.spacing.window_margin = egui::Margin::same(24.0);
+    style.spacing.button_padding = Vec2::new(16.0, 8.0);
+
+    ctx.set_style(style);
+}
+
+fn get_app_icon() -> Option<eframe::IconData> {
+    if let Ok(image_data) = std::fs::read("assets/app-icon.png") {
+        if let Ok(image) = image::load_from_memory(&image_data) {
+            let image = image.to_rgba8();
+            let (width, height) = image.dimensions();
+            return Some(eframe::IconData {
+                rgba: image.into_raw(),
+                width,
+                height,
+            });
         }
     }
+    None
 }
 
 impl VncApp {
@@ -530,6 +573,7 @@ impl VncApp {
 
 impl eframe::App for VncApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        setup_custom_style(ctx);
         if self.icons.is_empty() {
             self.load_icons(ctx);
         }
@@ -538,207 +582,300 @@ impl eframe::App for VncApp {
 
         match self.state {
             AppState::Connect => {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(20.0);
-                        ui.heading("New TightVNC Connection");
-                        ui.add_space(20.0);
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::none().fill(Color32::from_rgb(15, 15, 18)))
+                    .show(ctx, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(40.0); // Add a small margin from the top instead of large offset
 
-                        egui::Grid::new("connect_grid")
-                            .num_columns(2)
-                            .spacing([10.0, 10.0])
-                            .show(ui, |ui| {
-                                ui.label("Remote Host:");
-                                ui.text_edit_singleline(&mut self.host);
-                                ui.end_row();
+                            // Card UI
+                            egui::Frame::window(&ui.style())
+                                .fill(Color32::from_rgb(30, 30, 35))
+                                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(60, 60, 70)))
+                                .show(ui, |ui| {
+                                    ui.set_width(400.0);
+                                    ui.add_space(10.0);
 
-                                ui.label("Port:");
-                                ui.text_edit_singleline(&mut self.port);
-                                ui.end_row();
+                                    ui.vertical_centered(|ui| {
+                                        ui.heading(
+                                            egui::RichText::new("VNC Remote Desktop")
+                                                .size(24.0)
+                                                .strong(),
+                                        );
+                                        ui.label(
+                                            egui::RichText::new("Connect to your remote session")
+                                                .color(Color32::from_rgb(150, 150, 160)),
+                                        );
+                                    });
 
-                                ui.label("Password:");
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut self.password).password(true),
-                                );
-                                ui.end_row();
-                            });
+                                    ui.add_space(20.0);
 
-                        ui.add_space(10.0);
-                        ui.checkbox(&mut self.shared, "Request shared session");
+                                    egui::Grid::new("connect_grid")
+                                        .num_columns(2)
+                                        .spacing([15.0, 15.0])
+                                        .show(ui, |ui| {
+                                            ui.label(egui::RichText::new("Remote Host:").strong());
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut self.host)
+                                                    .hint_text("127.0.0.1"),
+                                            );
+                                            ui.end_row();
 
-                        ui.add_space(20.0);
-                        ui.horizontal(|ui| {
-                            ui.add_space(ui.available_width() / 4.0);
-                            if ui.button("Connect").clicked() {
-                                self.connect();
-                            }
-                            if ui.button("Options...").clicked() {
-                                self.show_options = true;
-                            }
-                            if ui.button("Clear history").clicked() {
-                                let _ = std::fs::remove_file("vnc_config.json");
-                                self.host = "localhost".to_string();
-                                self.port = "5900".to_string();
-                                self.password = String::new();
-                            }
-                            if ui.button("Close").clicked() {
-                                frame.close();
-                            }
+                                            ui.label(egui::RichText::new("Port:").strong());
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut self.port)
+                                                    .hint_text("5900"),
+                                            );
+                                            ui.end_row();
+
+                                            ui.label(egui::RichText::new("Password:").strong());
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut self.password)
+                                                    .password(true)
+                                                    .hint_text("Optional"),
+                                            );
+                                            ui.end_row();
+                                        });
+
+                                    ui.add_space(15.0);
+                                    ui.checkbox(&mut self.shared, "Request shared session");
+
+                                    ui.add_space(25.0);
+
+                                    ui.vertical_centered_justified(|ui| {
+                                        let connect_btn = ui.add_sized(
+                                            [ui.available_width(), 40.0],
+                                            egui::Button::new(
+                                                egui::RichText::new("Connect Now")
+                                                    .size(16.0)
+                                                    .strong(),
+                                            )
+                                            .fill(Color32::from_rgb(0, 120, 215)),
+                                        );
+
+                                        if connect_btn.clicked() {
+                                            self.connect();
+                                        }
+                                    });
+
+                                    ui.add_space(20.0);
+                                    ui.horizontal(|ui| {
+                                        ui.style_mut().visuals.widgets.inactive.bg_fill =
+                                            Color32::from_rgb(40, 40, 50);
+                                        if ui.button("Options...").clicked() {
+                                            self.show_options = true;
+                                        }
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                if ui.button("Close").clicked() {
+                                                    frame.close();
+                                                }
+                                                if ui.button("Clear history").clicked() {
+                                                    let _ = std::fs::remove_file("vnc_config.json");
+                                                    self.host = "localhost".to_string();
+                                                    self.port = "5900".to_string();
+                                                    self.password = String::new();
+                                                }
+                                            },
+                                        );
+                                    });
+                                    ui.add_space(10.0);
+                                });
                         });
                     });
-                });
 
                 egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
                     ui.label(&self.status_text);
                 });
             }
             AppState::Viewing => {
-                egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        if let Some(icon) = self.icons.get("button-info") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Info")
-                                .clicked()
-                            {
-                                self.show_info = !self.show_info;
-                            }
-                        }
-                        if let Some(icon) = self.icons.get("button-refresh") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Refresh")
-                                .clicked()
-                            {
-                                if let Some(ref mut vnc) = self.vnc_client {
-                                    vnc.request_update(
-                                        Rect {
-                                            left: 0,
-                                            top: 0,
-                                            width: self.screen_size.0,
-                                            height: self.screen_size.1,
-                                        },
-                                        false,
+                egui::TopBottomPanel::top("toolbar")
+                    .frame(egui::Frame::none().fill(Color32::from_rgb(10, 10, 12)))
+                    .show(ctx, |ui| {
+                        ui.spacing_mut().item_spacing = Vec2::new(4.0, 4.0);
+                        ui.spacing_mut().button_padding = Vec2::new(4.0, 4.0);
+                        ui.horizontal(|ui| {
+                            if let Some(icon) = self.icons.get("button-info") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
                                     )
-                                    .unwrap();
+                                    .on_hover_text("Info")
+                                    .clicked()
+                                {
+                                    self.show_info = !self.show_info;
                                 }
                             }
-                        }
-
-                        ui.separator();
-
-                        if let Some(icon) = self.icons.get("button-zoom-out") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Zoom Out")
-                                .clicked()
-                            {
-                                self.scale *= 0.8;
-                                self.zoom_fit = false;
-                                ctx.request_repaint();
-                            }
-                        }
-                        if let Some(icon) = self.icons.get("button-zoom-in") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Zoom In")
-                                .clicked()
-                            {
-                                self.scale *= 1.25;
-                                self.zoom_fit = false;
-                                ctx.request_repaint();
-                            }
-                        }
-                        if let Some(icon) = self.icons.get("button-zoom-100") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Zoom 100%")
-                                .clicked()
-                            {
-                                self.scale = 1.0;
-                                self.zoom_fit = false;
-                                ctx.request_repaint();
-                            }
-                        }
-                        if let Some(icon) = self.icons.get("button-zoom-fit") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Zoom to Fit")
-                                .clicked()
-                            {
-                                self.zoom_fit = !self.zoom_fit;
-                                ctx.request_repaint();
-                            }
-                        }
-                        if let Some(icon) = self.icons.get("button-zoom-fullscreen") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Full Screen")
-                                .clicked()
-                            {
-                                let fullscreen = frame.info().window_info.fullscreen;
-                                frame.set_fullscreen(!fullscreen);
-                            }
-                        }
-
-                        ui.separator();
-
-                        if let Some(icon) = self.icons.get("button-ctrl-alt-del") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Send Ctrl-Alt-Del")
-                                .clicked()
-                            {
-                                if let Some(ref mut vnc) = self.vnc_client {
-                                    vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
-                                    vnc.send_key_event(true, 0xFFE9).unwrap(); // Alt
-                                    vnc.send_key_event(true, 0xFFFF).unwrap(); // Del
-                                    vnc.send_key_event(false, 0xFFFF).unwrap();
-                                    vnc.send_key_event(false, 0xFFE9).unwrap();
-                                    vnc.send_key_event(false, 0xFFE3).unwrap();
+                            if let Some(icon) = self.icons.get("button-refresh") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Refresh")
+                                    .clicked()
+                                {
+                                    if let Some(ref mut vnc) = self.vnc_client {
+                                        vnc.request_update(
+                                            Rect {
+                                                left: 0,
+                                                top: 0,
+                                                width: self.screen_size.0,
+                                                height: self.screen_size.1,
+                                            },
+                                            false,
+                                        )
+                                        .unwrap();
+                                    }
                                 }
                             }
-                        }
-                        if let Some(icon) = self.icons.get("button-win") {
-                            if ui
-                                .add(egui::ImageButton::new(icon, Vec2::splat(24.0)))
-                                .on_hover_text("Send Win Key")
-                                .clicked()
-                            {
-                                if let Some(ref mut vnc) = self.vnc_client {
-                                    vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
-                                    vnc.send_key_event(true, 0xFF1B).unwrap(); // Esc
-                                    vnc.send_key_event(false, 0xFF1B).unwrap();
-                                    vnc.send_key_event(false, 0xFFE3).unwrap();
+
+                            ui.add(egui::Separator::default().vertical().spacing(2.0));
+
+                            if let Some(icon) = self.icons.get("button-zoom-out") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Zoom Out")
+                                    .clicked()
+                                {
+                                    self.scale *= 0.8;
+                                    self.zoom_fit = false;
+                                    ctx.request_repaint();
                                 }
                             }
-                        }
-
-                        // Move right-aligned items into the SAME horizontal row
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if let Some(icon) = self.icons.get("button-options") {
-                                let is_active = self.show_options;
-                                let button = egui::ImageButton::new(icon, Vec2::splat(24.0))
-                                    .selected(is_active)
-                                    .tint(if is_active {
-                                        Color32::from_rgb(0, 150, 255)
-                                    } else {
-                                        Color32::WHITE
-                                    });
-
-                                if ui.add(button).on_hover_text("Connection Options").clicked() {
-                                    self.show_options = !self.show_options;
+                            if let Some(icon) = self.icons.get("button-zoom-in") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Zoom In")
+                                    .clicked()
+                                {
+                                    self.scale *= 1.25;
+                                    self.zoom_fit = false;
+                                    ctx.request_repaint();
                                 }
                             }
-                            ui.separator();
-                            ui.label(format!(
-                                "Scale: {:.2} {}",
-                                self.scale,
-                                if self.zoom_fit { "(Fit)" } else { "" }
-                            ));
+                            if let Some(icon) = self.icons.get("button-zoom-100") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Zoom 100%")
+                                    .clicked()
+                                {
+                                    self.scale = 1.0;
+                                    self.zoom_fit = false;
+                                    ctx.request_repaint();
+                                }
+                            }
+                            if let Some(icon) = self.icons.get("button-zoom-fit") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Zoom to Fit")
+                                    .clicked()
+                                {
+                                    self.zoom_fit = !self.zoom_fit;
+                                    ctx.request_repaint();
+                                }
+                            }
+                            if let Some(icon) = self.icons.get("button-zoom-fullscreen") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Full Screen")
+                                    .clicked()
+                                {
+                                    let fullscreen = frame.info().window_info.fullscreen;
+                                    frame.set_fullscreen(!fullscreen);
+                                }
+                            }
+
+                            ui.add(egui::Separator::default().vertical().spacing(2.0));
+
+                            if let Some(icon) = self.icons.get("button-ctrl-alt-del") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Send Ctrl-Alt-Del")
+                                    .clicked()
+                                {
+                                    if let Some(ref mut vnc) = self.vnc_client {
+                                        vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
+                                        vnc.send_key_event(true, 0xFFE9).unwrap(); // Alt
+                                        vnc.send_key_event(true, 0xFFFF).unwrap(); // Del
+                                        vnc.send_key_event(false, 0xFFFF).unwrap();
+                                        vnc.send_key_event(false, 0xFFE9).unwrap();
+                                        vnc.send_key_event(false, 0xFFE3).unwrap();
+                                    }
+                                }
+                            }
+                            if let Some(icon) = self.icons.get("button-win") {
+                                if ui
+                                    .add(
+                                        egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                            .tint(Color32::WHITE),
+                                    )
+                                    .on_hover_text("Send Win Key")
+                                    .clicked()
+                                {
+                                    if let Some(ref mut vnc) = self.vnc_client {
+                                        vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
+                                        vnc.send_key_event(true, 0xFF1B).unwrap(); // Esc
+                                        vnc.send_key_event(false, 0xFF1B).unwrap();
+                                        vnc.send_key_event(false, 0xFFE3).unwrap();
+                                    }
+                                }
+                            }
+
+                            // Move right-aligned items into the SAME horizontal row
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if let Some(icon) = self.icons.get("button-options") {
+                                        let is_active = self.show_options;
+                                        let button =
+                                            egui::ImageButton::new(icon, Vec2::splat(18.0))
+                                                .tint(Color32::WHITE)
+                                                .selected(is_active)
+                                                .tint(if is_active {
+                                                    Color32::from_rgb(0, 150, 255)
+                                                } else {
+                                                    Color32::WHITE
+                                                });
+
+                                        if ui
+                                            .add(button)
+                                            .on_hover_text("Connection Options")
+                                            .clicked()
+                                        {
+                                            self.show_options = !self.show_options;
+                                        }
+                                    }
+                                    ui.add(egui::Separator::default().vertical().spacing(2.0));
+                                    ui.label(format!(
+                                        "Scale: {:.2} {}",
+                                        self.scale,
+                                        if self.zoom_fit { "(Fit)" } else { "" }
+                                    ));
+                                },
+                            );
                         });
                     });
-                });
 
                 egui::CentralPanel::default()
                     .frame(
@@ -775,8 +912,7 @@ impl eframe::App for VncApp {
                                     egui::Sense::hover(),
                                 );
 
-                                let image_rect =
-                                    egui::Rect::from_center_size(rect.center(), display_size);
+                                let image_rect = egui::Rect::from_min_size(rect.min, display_size);
 
                                 // We need a response specifically for the image area for input
                                 let image_response = ui.interact(
@@ -947,10 +1083,11 @@ fn main() {
     env_logger::init();
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(800.0, 600.0)),
+        icon_data: get_app_icon(),
         ..Default::default()
     };
     let _ = eframe::run_native(
-        "TightVNC Viewer",
+        "VNC Remote Desktop",
         options,
         Box::new(|_cc| Box::new(VncApp::default())),
     );
