@@ -178,47 +178,53 @@ fn get_app_icon() -> Option<eframe::IconData> {
 
 impl VncApp {
     fn load_icons(&mut self, ctx: &egui::Context) {
-        let icon_names = [
-            "button-options",
-            "button-info",
-            "button-refresh",
-            "button-zoom-out",
-            "button-zoom-in",
-            "button-zoom-100",
-            "button-zoom-fit",
-            "button-zoom-fullscreen",
-            "button-ctrl-alt-del",
-            "button-win",
+        let icon_data: [(&str, &[u8]); 10] = [
+            (
+                "button-options",
+                include_bytes!("../assets/svg/button-options.svg"),
+            ),
+            (
+                "button-info",
+                include_bytes!("../assets/svg/button-info.svg"),
+            ),
+            (
+                "button-refresh",
+                include_bytes!("../assets/svg/button-refresh.svg"),
+            ),
+            (
+                "button-zoom-out",
+                include_bytes!("../assets/svg/button-zoom-out.svg"),
+            ),
+            (
+                "button-zoom-in",
+                include_bytes!("../assets/svg/button-zoom-in.svg"),
+            ),
+            (
+                "button-zoom-100",
+                include_bytes!("../assets/svg/button-zoom-100.svg"),
+            ),
+            (
+                "button-zoom-fit",
+                include_bytes!("../assets/svg/button-zoom-fit.svg"),
+            ),
+            (
+                "button-zoom-fullscreen",
+                include_bytes!("../assets/svg/button-zoom-fullscreen.svg"),
+            ),
+            (
+                "button-ctrl-alt-del",
+                include_bytes!("../assets/svg/button-ctrl-alt-del.svg"),
+            ),
+            ("button-win", include_bytes!("../assets/svg/button-win.svg")),
         ];
 
-        for name in icon_names {
-            // Try SVG first
-            let svg_path = format!("assets/svg/{}.svg", name);
-            if let Ok(svg_data) = std::fs::read(&svg_path) {
-                match egui_extras::image::load_svg_bytes(&svg_data) {
-                    Ok(color_image) => {
-                        let handle = ctx.load_texture(name, color_image, Default::default());
-                        self.icons.insert(name.to_string(), handle);
-                        continue;
-                    }
-                    Err(e) => warn!("Failed to load SVG {}: {}", svg_path, e),
-                }
-            }
-
-            // Fallback to PNG
-            let png_path = format!("assets/{}.png", name);
-            if let Ok(image_data) = std::fs::read(&png_path) {
-                if let Ok(image) = image::load_from_memory(&image_data) {
-                    let size = [image.width() as usize, image.height() as usize];
-                    let image_buffer = image.to_rgba8();
-                    let pixels = image_buffer.as_flat_samples();
-                    let color_image =
-                        egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
+        for (name, data) in icon_data {
+            match egui_extras::image::load_svg_bytes(data) {
+                Ok(color_image) => {
                     let handle = ctx.load_texture(name, color_image, Default::default());
                     self.icons.insert(name.to_string(), handle);
                 }
-            } else {
-                warn!("Failed to load icon: {}", png_path);
+                Err(e) => warn!("Failed to load embedded SVG {}: {}", name, e),
             }
         }
     }
@@ -707,7 +713,10 @@ impl eframe::App for VncApp {
                                 {
                                     self.show_info = !self.show_info;
                                 }
+                            } else if ui.button("ℹ").on_hover_text("Info").clicked() {
+                                self.show_info = !self.show_info;
                             }
+
                             if let Some(icon) = self.icons.get("button-refresh") {
                                 if ui
                                     .add(
@@ -718,7 +727,7 @@ impl eframe::App for VncApp {
                                     .clicked()
                                 {
                                     if let Some(ref mut vnc) = self.vnc_client {
-                                        vnc.request_update(
+                                        let _ = vnc.request_update(
                                             Rect {
                                                 left: 0,
                                                 top: 0,
@@ -726,9 +735,20 @@ impl eframe::App for VncApp {
                                                 height: self.screen_size.1,
                                             },
                                             false,
-                                        )
-                                        .unwrap();
+                                        );
                                     }
+                                }
+                            } else if ui.button("🔄").on_hover_text("Refresh").clicked() {
+                                if let Some(ref mut vnc) = self.vnc_client {
+                                    let _ = vnc.request_update(
+                                        Rect {
+                                            left: 0,
+                                            top: 0,
+                                            width: self.screen_size.0,
+                                            height: self.screen_size.1,
+                                        },
+                                        false,
+                                    );
                                 }
                             }
 
@@ -747,7 +767,11 @@ impl eframe::App for VncApp {
                                     self.zoom_fit = false;
                                     ctx.request_repaint();
                                 }
+                            } else if ui.button("➖").on_hover_text("Zoom Out").clicked() {
+                                self.scale *= 0.8;
+                                self.zoom_fit = false;
                             }
+
                             if let Some(icon) = self.icons.get("button-zoom-in") {
                                 if ui
                                     .add(
@@ -761,7 +785,11 @@ impl eframe::App for VncApp {
                                     self.zoom_fit = false;
                                     ctx.request_repaint();
                                 }
+                            } else if ui.button("➕").on_hover_text("Zoom In").clicked() {
+                                self.scale *= 1.25;
+                                self.zoom_fit = false;
                             }
+
                             if let Some(icon) = self.icons.get("button-zoom-100") {
                                 if ui
                                     .add(
@@ -775,7 +803,11 @@ impl eframe::App for VncApp {
                                     self.zoom_fit = false;
                                     ctx.request_repaint();
                                 }
+                            } else if ui.button("1:1").on_hover_text("Zoom 100%").clicked() {
+                                self.scale = 1.0;
+                                self.zoom_fit = false;
                             }
+
                             if let Some(icon) = self.icons.get("button-zoom-fit") {
                                 if ui
                                     .add(
@@ -788,7 +820,10 @@ impl eframe::App for VncApp {
                                     self.zoom_fit = !self.zoom_fit;
                                     ctx.request_repaint();
                                 }
+                            } else if ui.button("⛶").on_hover_text("Zoom to Fit").clicked() {
+                                self.zoom_fit = !self.zoom_fit;
                             }
+
                             if let Some(icon) = self.icons.get("button-zoom-fullscreen") {
                                 if ui
                                     .add(
@@ -801,6 +836,9 @@ impl eframe::App for VncApp {
                                     let fullscreen = frame.info().window_info.fullscreen;
                                     frame.set_fullscreen(!fullscreen);
                                 }
+                            } else if ui.button("Full").on_hover_text("Full Screen").clicked() {
+                                let fullscreen = frame.info().window_info.fullscreen;
+                                frame.set_fullscreen(!fullscreen);
                             }
 
                             ui.add(egui::Separator::default().vertical().spacing(2.0));
@@ -815,15 +853,29 @@ impl eframe::App for VncApp {
                                     .clicked()
                                 {
                                     if let Some(ref mut vnc) = self.vnc_client {
-                                        vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
-                                        vnc.send_key_event(true, 0xFFE9).unwrap(); // Alt
-                                        vnc.send_key_event(true, 0xFFFF).unwrap(); // Del
-                                        vnc.send_key_event(false, 0xFFFF).unwrap();
-                                        vnc.send_key_event(false, 0xFFE9).unwrap();
-                                        vnc.send_key_event(false, 0xFFE3).unwrap();
+                                        let _ = vnc.send_key_event(true, 0xFFE3); // Ctrl
+                                        let _ = vnc.send_key_event(true, 0xFFE9); // Alt
+                                        let _ = vnc.send_key_event(true, 0xFFFF); // Del
+                                        let _ = vnc.send_key_event(false, 0xFFFF);
+                                        let _ = vnc.send_key_event(false, 0xFFE9);
+                                        let _ = vnc.send_key_event(false, 0xFFE3);
                                     }
                                 }
+                            } else if ui
+                                .button("CAD")
+                                .on_hover_text("Send Ctrl-Alt-Del")
+                                .clicked()
+                            {
+                                if let Some(ref mut vnc) = self.vnc_client {
+                                    let _ = vnc.send_key_event(true, 0xFFE3); // Ctrl
+                                    let _ = vnc.send_key_event(true, 0xFFE9); // Alt
+                                    let _ = vnc.send_key_event(true, 0xFFFF); // Del
+                                    let _ = vnc.send_key_event(false, 0xFFFF);
+                                    let _ = vnc.send_key_event(false, 0xFFE9);
+                                    let _ = vnc.send_key_event(false, 0xFFE3);
+                                }
                             }
+
                             if let Some(icon) = self.icons.get("button-win") {
                                 if ui
                                     .add(
@@ -834,11 +886,18 @@ impl eframe::App for VncApp {
                                     .clicked()
                                 {
                                     if let Some(ref mut vnc) = self.vnc_client {
-                                        vnc.send_key_event(true, 0xFFE3).unwrap(); // Ctrl
-                                        vnc.send_key_event(true, 0xFF1B).unwrap(); // Esc
-                                        vnc.send_key_event(false, 0xFF1B).unwrap();
-                                        vnc.send_key_event(false, 0xFFE3).unwrap();
+                                        let _ = vnc.send_key_event(true, 0xFFE3); // Ctrl
+                                        let _ = vnc.send_key_event(true, 0xFF1B); // Esc
+                                        let _ = vnc.send_key_event(false, 0xFF1B);
+                                        let _ = vnc.send_key_event(false, 0xFFE3);
                                     }
+                                }
+                            } else if ui.button("Win").on_hover_text("Send Win Key").clicked() {
+                                if let Some(ref mut vnc) = self.vnc_client {
+                                    let _ = vnc.send_key_event(true, 0xFFE3); // Ctrl
+                                    let _ = vnc.send_key_event(true, 0xFF1B); // Esc
+                                    let _ = vnc.send_key_event(false, 0xFF1B);
+                                    let _ = vnc.send_key_event(false, 0xFFE3);
                                 }
                             }
 
@@ -865,6 +924,12 @@ impl eframe::App for VncApp {
                                         {
                                             self.show_options = !self.show_options;
                                         }
+                                    } else if ui
+                                        .button("Opt")
+                                        .on_hover_text("Connection Options")
+                                        .clicked()
+                                    {
+                                        self.show_options = !self.show_options;
                                     }
                                     ui.add(egui::Separator::default().vertical().spacing(2.0));
                                     ui.label(format!(
