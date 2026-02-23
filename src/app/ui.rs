@@ -31,16 +31,15 @@ pub fn setup_custom_style(ctx: &egui::Context) {
 }
 
 pub fn get_app_icon() -> Option<eframe::IconData> {
-    if let Ok(image_data) = std::fs::read("assets/app-icon.png") {
-        if let Ok(image) = image::load_from_memory(&image_data) {
-            let image = image.to_rgba8();
-            let (width, height) = image.dimensions();
-            return Some(eframe::IconData {
-                rgba: image.into_raw(),
-                width,
-                height,
-            });
-        }
+    let image_data = include_bytes!("../../assets/app-icon.png");
+    if let Ok(image) = image::load_from_memory(image_data) {
+        let image = image.to_rgba8();
+        let (width, height) = image.dimensions();
+        return Some(eframe::IconData {
+            rgba: image.into_raw(),
+            width,
+            height,
+        });
     }
     None
 }
@@ -204,10 +203,42 @@ impl eframe::App for VncApp {
                                         .spacing([15.0, 15.0])
                                         .show(ui, |ui| {
                                             ui.label(egui::RichText::new("Remote Host:").strong());
-                                            ui.add(
-                                                egui::TextEdit::singleline(&mut self.host)
-                                                    .hint_text("127.0.0.1"),
-                                            );
+                                            ui.horizontal(|ui| {
+                                                let host_response = ui.add(
+                                                    egui::TextEdit::singleline(&mut self.host)
+                                                        .desired_width(180.0)
+                                                        .hint_text("127.0.0.1"),
+                                                );
+                                                if host_response.changed() {
+                                                    let host = self.host.clone();
+                                                    self.load_config_for_host(&host);
+                                                }
+
+                                                let mut hosts: Vec<_> =
+                                                    self.config.hosts.keys().cloned().collect();
+                                                hosts.sort();
+                                                if !hosts.is_empty() {
+                                                    ui.spacing_mut().item_spacing.x = 2.0;
+                                                    ui.style_mut().spacing.button_padding =
+                                                        egui::vec2(4.0, 2.0);
+                                                    ui.menu_button("v", |ui| {
+                                                        ui.set_min_width(180.0);
+                                                        for h in hosts {
+                                                            if ui
+                                                                .selectable_label(
+                                                                    self.host == h,
+                                                                    &h,
+                                                                )
+                                                                .clicked()
+                                                            {
+                                                                self.host = h.clone();
+                                                                self.load_config_for_host(&h);
+                                                                ui.close_menu();
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                            });
                                             ui.end_row();
 
                                             ui.label(egui::RichText::new("Port:").strong());
@@ -262,9 +293,7 @@ impl eframe::App for VncApp {
                                                 }
                                                 if ui.button("Clear history").clicked() {
                                                     let _ = std::fs::remove_file("vnc_config.json");
-                                                    self.host = "localhost".to_string();
-                                                    self.port = "5900".to_string();
-                                                    self.password = String::new();
+                                                    *self = Self::default();
                                                 }
                                             },
                                         );
@@ -656,10 +685,8 @@ impl eframe::App for VncApp {
                                 egui::Slider::new(&mut self.scale, 0.1..=4.0).text("Manual Scale"),
                             );
                         });
-                    });
 
-                    ui.add_space(20.0);
-                    ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
+                        ui.add_space(20.0);
                         ui.horizontal(|ui| {
                             if ui.button("Apply").clicked() {
                                 // Apply encoding settings if connected

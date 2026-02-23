@@ -2,7 +2,8 @@
 
 A high-performance, cross-platform VNC client written in Rust using the `egui` framework. This client provides a smooth and responsive remote desktop experience with a modern, native-feeling UI.
 
-![VNC Client Preview](https://raw.githubusercontent.com/appsjuragan/vnc-client/master/assets/preview.png) *(Placeholder if you have an image)*
+![Screenshot 1](assets/screenshot1.png)
+![Screenshot 2](assets/screenshot2.png)
 
 ## Features
 

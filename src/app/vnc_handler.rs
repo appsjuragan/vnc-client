@@ -1,5 +1,4 @@
 use crate::app::{AppState, VncApp};
-use crate::config::Config;
 use eframe::egui::{self, Color32};
 use log::{error, info};
 use std::thread;
@@ -18,21 +17,25 @@ impl VncApp {
         self.status_text = format!("Connecting to {}:{}...", host, port_str);
 
         // Save config
-        let config = Config {
-            host: self.host.clone(),
-            port: self.port.clone(),
-            password: self.password.clone(),
-            shared: self.shared,
-            view_only: self.view_only,
-            zoom_fit: self.zoom_fit,
-            scale: self.scale,
-            preferred_encoding: self.preferred_encoding.clone(),
-            compression_level: self.compression_level,
-            quality_level: self.quality_level,
-            allow_copyrect: self.allow_copyrect,
-            disable_clipboard: self.disable_clipboard,
-        };
-        if let Ok(content) = serde_json::to_string_pretty(&config) {
+        self.config.last_host = self.host.clone();
+        self.config.hosts.insert(
+            self.host.clone(),
+            crate::config::HostConfig {
+                port: self.port.clone(),
+                password: self.password.clone(),
+                shared: self.shared,
+                view_only: self.view_only,
+                zoom_fit: self.zoom_fit,
+                scale: self.scale,
+                preferred_encoding: self.preferred_encoding.clone(),
+                compression_level: self.compression_level,
+                quality_level: self.quality_level,
+                allow_copyrect: self.allow_copyrect,
+                disable_clipboard: self.disable_clipboard,
+            },
+        );
+
+        if let Ok(content) = serde_json::to_string_pretty(&self.config) {
             let _ = std::fs::write("vnc_config.json", content);
         }
 

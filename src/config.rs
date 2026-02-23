@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize)]
-pub struct Config {
-    pub host: String,
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HostConfig {
     pub port: String,
     pub password: String,
     pub shared: bool,
@@ -16,10 +16,15 @@ pub struct Config {
     pub disable_clipboard: bool,
 }
 
-impl Default for Config {
+#[derive(Serialize, Deserialize, Default)]
+pub struct Config {
+    pub last_host: String,
+    pub hosts: HashMap<String, HostConfig>,
+}
+
+impl Default for HostConfig {
     fn default() -> Self {
         Self {
-            host: "localhost".to_string(),
             port: "5900".to_string(),
             password: "".to_string(),
             shared: true,
